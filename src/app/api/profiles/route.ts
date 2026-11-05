@@ -9,6 +9,7 @@ export async function GET() {
     profiles: store.profiles,
     defaultSlug: store.adminConfig.defaultSlug || "facxx14",
     hasPassword: Boolean(store.adminConfig.passwordHash),
+    storageEngine: store.storageEngine || "local",
   });
 }
 
