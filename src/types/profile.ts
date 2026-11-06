@@ -38,6 +38,22 @@ export type OrbStyle =
   | "neon-ring"
   | "crystal";
 
+export type EntryAnimation =
+  | "cyber-boot"
+  | "glitch-drop"
+  | "portal-warp"
+  | "neon-materialize"
+  | "cinematic-fade"
+  | "matrix-decode"
+  | "none";
+
+export type IntroScreenStyle =
+  | "none"
+  | "glass-blur"
+  | "terminal-boot"
+  | "cyber-gate"
+  | "pulse-portal";
+
 export interface VisualFxConfig {
   cardFloat: boolean;
   tilt3d: boolean;
@@ -48,6 +64,7 @@ export interface VisualFxConfig {
 
 export interface MusicConfig {
   enabled: boolean;
+  autoPlay?: boolean;
   source: MusicSource;
   preset: SynthPreset;
   url: string;
@@ -100,6 +117,9 @@ export interface ProfileData {
   avatarStyle?: AvatarStyle;
   titleEffect?: TitleEffect;
   orbStyle?: OrbStyle;
+  entryAnimation?: EntryAnimation;
+  introScreen?: IntroScreenStyle;
+  introText?: string;
   visualFx?: VisualFxConfig;
   music: MusicConfig;
   links: ProfileLink[];
@@ -447,12 +467,16 @@ export function normalizeProfile(
     avatarStyle: data?.avatarStyle || "orbit",
     titleEffect: data?.titleEffect || "glitch",
     orbStyle: data?.orbStyle || "halo",
+    entryAnimation: data?.entryAnimation || "cyber-boot",
+    introScreen: data?.introScreen || "none",
+    introText: data?.introText || "[ CLICK PARA ENTRAR ]",
     visualFx: {
       ...DEFAULT_VISUAL_FX,
       ...(data?.visualFx || {}),
     },
     music: {
       ...structuredClone(DEFAULT_PROFILE.music),
+      autoPlay: data?.music?.autoPlay !== undefined ? Boolean(data.music.autoPlay) : true,
       ...(data?.music || {}),
     },
     links: Array.isArray(data?.links)

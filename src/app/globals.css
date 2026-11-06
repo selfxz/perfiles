@@ -3176,3 +3176,380 @@ body.has-admin-bar {
   .links a { transition: none; }
 }
 
+
+/* ==========================================================================
+   ANIMACIONES DE ENTRADA DEL PERFIL (entryAnimation) Y PANTALLAS DE BIENVENIDA (introScreen)
+   ========================================================================== */
+
+/* 1. Cyber Boot Sequence (CRT expansion + staggered nodes) */
+@keyframes entryCyberBoot {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.08) scaleY(0.02);
+    filter: brightness(3) drop-shadow(0 0 40px var(--accent));
+  }
+  45% {
+    opacity: 1;
+    transform: scaleX(1.02) scaleY(0.05);
+    filter: brightness(2.2) drop-shadow(0 0 28px var(--accent));
+  }
+  78% {
+    transform: scaleX(0.99) scaleY(1.02);
+    filter: brightness(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes entryChildCascade {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.win.entry-cyber-boot {
+  animation: entryCyberBoot 0.78s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.win.entry-cyber-boot .hero,
+.win.entry-cyber-boot .orb-link-item,
+.win.entry-cyber-boot .featured-card,
+.win.entry-cyber-boot .copy-tag-pill,
+.win.entry-cyber-boot .music-hud {
+  animation: entryChildCascade 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.win.entry-cyber-boot .hero { animation-delay: 0.22s; }
+.win.entry-cyber-boot .orb-link-item:nth-child(1) { animation-delay: 0.30s; }
+.win.entry-cyber-boot .orb-link-item:nth-child(2) { animation-delay: 0.36s; }
+.win.entry-cyber-boot .orb-link-item:nth-child(3) { animation-delay: 0.42s; }
+.win.entry-cyber-boot .orb-link-item:nth-child(4) { animation-delay: 0.48s; }
+.win.entry-cyber-boot .orb-link-item:nth-child(5) { animation-delay: 0.54s; }
+.win.entry-cyber-boot .orb-link-item:nth-child(6) { animation-delay: 0.60s; }
+.win.entry-cyber-boot .featured-card { animation-delay: 0.52s; }
+.win.entry-cyber-boot .copy-tag-pill { animation-delay: 0.58s; }
+.win.entry-cyber-boot .music-hud { animation-delay: 0.64s; }
+
+/* 2. Glitch Teleport (Distorsión RGB + caída táctica) */
+@keyframes entryGlitchDrop {
+  0% {
+    opacity: 0;
+    transform: translateY(-60px) skewX(18deg) scale(1.08);
+    filter: hue-rotate(90deg) contrast(2.5);
+  }
+  25% {
+    opacity: 0.85;
+    transform: translate(14px, 8px) skewX(-12deg);
+  }
+  45% {
+    transform: translate(-12px, -4px) skewX(8deg);
+    filter: hue-rotate(-60deg) contrast(1.8);
+  }
+  65% {
+    transform: translate(6px, 2px) skewX(-3deg);
+  }
+  82% {
+    transform: translate(-3px, 0) skewX(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) skewX(0);
+    filter: none;
+  }
+}
+
+.win.entry-glitch-drop {
+  animation: entryGlitchDrop 0.72s steps(10, end) both;
+}
+
+/* 3. Portal Dimensional 3D (Giro hiperespacial) */
+@keyframes entryPortalWarp {
+  0% {
+    opacity: 0;
+    transform: perspective(1100px) rotateX(-42deg) rotateY(28deg) translateZ(-260px) scale(0.65);
+    filter: blur(12px) brightness(2);
+  }
+  65% {
+    opacity: 1;
+    transform: perspective(1100px) rotateX(6deg) rotateY(-4deg) translateZ(20px) scale(1.02);
+    filter: blur(0px) brightness(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(1100px) rotateX(0deg) rotateY(0deg) translateZ(0) scale(1);
+    filter: none;
+  }
+}
+
+.win.entry-portal-warp {
+  animation: entryPortalWarp 0.88s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* 4. Materialización Holográfica (Escaneo láser vertical) */
+@keyframes entryNeonMaterialize {
+  0% {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+    filter: blur(14px) brightness(2.4) drop-shadow(0 18px 25px var(--accent));
+    transform: translateY(16px);
+  }
+  70% {
+    opacity: 1;
+    clip-path: inset(0 0 0% 0);
+    filter: blur(1px) brightness(1.3);
+  }
+  100% {
+    opacity: 1;
+    clip-path: inset(0 0 0% 0);
+    filter: none;
+    transform: translateY(0);
+  }
+}
+
+.win.entry-neon-materialize {
+  animation: entryNeonMaterialize 0.92s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* 5. Elevación Cinemática (Suave estilo Framer / Apple Spring) */
+@keyframes entryCinematicFade {
+  0% {
+    opacity: 0;
+    transform: translateY(44px) scale(0.94);
+    filter: blur(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.win.entry-cinematic-fade {
+  animation: entryCinematicFade 0.82s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.win.entry-cinematic-fade .hero,
+.win.entry-cinematic-fade .orb-link-item,
+.win.entry-cinematic-fade .featured-card,
+.win.entry-cinematic-fade .copy-tag-pill,
+.win.entry-cinematic-fade .music-hud {
+  animation: entryChildCascade 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.win.entry-cinematic-fade .hero { animation-delay: 0.12s; }
+.win.entry-cinematic-fade .orb-link-item { animation-delay: 0.22s; }
+.win.entry-cinematic-fade .featured-card { animation-delay: 0.32s; }
+.win.entry-cinematic-fade .copy-tag-pill { animation-delay: 0.40s; }
+.win.entry-cinematic-fade .music-hud { animation-delay: 0.48s; }
+
+/* 6. Decodificación Matrix (Pulso cuántico digital) */
+@keyframes entryMatrixDecode {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+    box-shadow: 0 0 90px var(--accent), inset 0 0 60px var(--accent);
+    filter: contrast(3) brightness(1.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+    box-shadow: 0 0 65px var(--accent), inset 0 0 35px var(--accent);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: none;
+  }
+}
+
+.win.entry-matrix-decode {
+  animation: entryMatrixDecode 0.76s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ==========================================================================
+   PANTALLAS DE ENTRADA INTERACTIVAS OPCIONALES (introScreen)
+   Garantizan además reproducción de música al 100% con sonido al primer toque
+   ========================================================================== */
+.intro-screen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.55s ease;
+}
+
+.intro-screen-overlay.closing {
+  opacity: 0;
+  transform: scale(1.12);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+/* Estilo 1: Velo de Cristal Neón (glass-blur) */
+.intro-screen-overlay.intro-glass-blur {
+  background: radial-gradient(
+    circle at 50% 45%,
+    color-mix(in srgb, var(--accent) 18%, rgba(6, 6, 10, 0.84)),
+    rgba(3, 3, 6, 0.94) 75%
+  );
+  backdrop-filter: blur(22px) saturate(160%);
+}
+
+/* Estilo 2: Terminal Boot Hacker (terminal-boot) */
+.intro-screen-overlay.intro-terminal-boot {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.32) 0 1px,
+      transparent 1px 3px
+    ),
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--accent) 14%, #050508),
+      #020204 80%
+    );
+}
+
+/* Estilo 3: Compuerta Láser Dividida (cyber-gate) */
+.intro-screen-overlay.intro-cyber-gate {
+  background: rgba(4, 4, 8, 0.94);
+  backdrop-filter: blur(16px);
+}
+.intro-screen-overlay.intro-cyber-gate::before,
+.intro-screen-overlay.intro-cyber-gate::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), var(--accent), transparent);
+  box-shadow: 0 0 22px var(--accent);
+}
+.intro-screen-overlay.intro-cyber-gate::before { top: 28%; }
+.intro-screen-overlay.intro-cyber-gate::after { bottom: 28%; }
+
+/* Estilo 4: Portal de Energía Orbital (pulse-portal) */
+.intro-screen-overlay.intro-pulse-portal {
+  background: radial-gradient(
+    circle at 50% 50%,
+    color-mix(in srgb, var(--accent) 26%, #050508) 0%,
+    #030306 72%
+  );
+  backdrop-filter: blur(20px);
+}
+
+.intro-center-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  max-width: 380px;
+  width: 100%;
+  padding: 32px 26px;
+  border-radius: 24px;
+  background: rgba(12, 12, 18, 0.72);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, rgba(255, 255, 255, 0.12));
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.9),
+    0 0 50px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+@keyframes introOrbPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent),
+      0 0 32px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow:
+      0 0 0 18px transparent,
+      0 0 52px color-mix(in srgb, var(--accent) 75%, transparent);
+  }
+}
+
+.intro-avatar-orb {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #0d0d14;
+  font: 700 30px/1 var(--display);
+  color: var(--white);
+  animation: introOrbPulse 2.4s ease-in-out infinite;
+}
+.intro-avatar-orb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.intro-user-title {
+  margin: 0;
+  font: 700 28px/1.1 var(--display);
+  color: var(--white);
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 22px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+@keyframes introPromptBlink {
+  0%, 100% { opacity: 1; transform: translateY(0); }
+  50% { opacity: 0.55; transform: translateY(-2px); }
+}
+
+.intro-enter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 30%, #14141d),
+    rgba(20, 20, 28, 0.9)
+  );
+  border: 1px solid var(--accent);
+  color: var(--white);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 38%, transparent);
+  animation: introPromptBlink 2s ease-in-out infinite;
+}
+
+.intro-terminal-lines {
+  width: 100%;
+  text-align: left;
+  background: rgba(4, 4, 7, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.intro-terminal-lines b {
+  color: var(--accent);
+}

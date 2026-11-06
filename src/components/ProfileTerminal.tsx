@@ -8,8 +8,10 @@ import {
   CardStyle,
   DEFAULT_PROFILE,
   DEFAULT_VISUAL_FX,
+  EntryAnimation,
   FULL_STYLE_PRESETS,
   ICONS,
+  IntroScreenStyle,
   MusicSource,
   normalizeProfile,
   OrbStyle,
@@ -126,6 +128,15 @@ export default function ProfileTerminal({
   const [audioUploadStatus, setAudioUploadStatus] = useState<string>(
     "Ningún archivo cargado"
   );
+
+  // Entrance Animation & Optional Intro Screen state
+  const [entryAnimKey, setEntryAnimKey] = useState<number>(0);
+  const [introOverlayActive, setIntroOverlayActive] = useState<boolean>(() => {
+    if (isSystemMode) return false;
+    return Boolean(me.introScreen && me.introScreen !== "none");
+  });
+  const [introOverlayClosing, setIntroOverlayClosing] = useState<boolean>(false);
+  const autoPlayAttemptedRef = useRef<boolean>(false);
 
   // Typewriter, Clock, Uptime, Toast
   const [typedText, setTypedText] = useState<string>("");
@@ -334,11 +345,75 @@ export default function ProfileTerminal({
 
       const target = sanitizeSlug(initialSlug) || currentDefSlug || "facxx14";
       applySlug(target, mergedMap);
+
+      const loadedProfile = mergedMap[target];
+      if (!isSystemMode && loadedProfile) {
+        const normalizedLoaded = normalizeProfile(loadedProfile, target);
+        if (
+          normalizedLoaded.introScreen &&
+          normalizedLoaded.introScreen !== "none"
+        ) {
+          setIntroOverlayActive(true);
+        }
+      }
     }
 
     hydrateFromApi();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Automatic Music Playback on entering the public website (/[slug])
+  useEffect(() => {
+    if (isSystemMode || notFound) return;
+    if (!me.music?.enabled || me.music?.autoPlay === false) return;
+    // If an interactive Intro Screen is active, wait for the visitor to click it
+    if (introOverlayActive) return;
+
+    const triggerAutoPlay = () => {
+      if (!musicEngine.isPlaying() && me.music?.enabled) {
+        musicEngine.play(me.music);
+      }
+    };
+
+    // 1. Try playing immediately upon entering the page
+    if (!autoPlayAttemptedRef.current) {
+      autoPlayAttemptedRef.current = true;
+      triggerAutoPlay();
+    }
+
+    // 2. Fallback for browsers that require a first user gesture before unmuting audio
+    const onFirstGesture = () => {
+      if (!musicEngine.isPlaying() && me.music?.enabled) {
+        musicEngine.play(me.music);
+      }
+      window.removeEventListener("pointerdown", onFirstGesture);
+      window.removeEventListener("touchstart", onFirstGesture);
+      window.removeEventListener("keydown", onFirstGesture);
+    };
+
+    window.addEventListener("pointerdown", onFirstGesture, { passive: true });
+    window.addEventListener("touchstart", onFirstGesture, { passive: true });
+    window.addEventListener("keydown", onFirstGesture, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", onFirstGesture);
+      window.removeEventListener("touchstart", onFirstGesture);
+      window.removeEventListener("keydown", onFirstGesture);
+    };
+  }, [isSystemMode, notFound, me.music, introOverlayActive]);
+
+  const handleDismissIntroScreen = useCallback(() => {
+    if (introOverlayClosing) return;
+    setIntroOverlayClosing(true);
+    if (me.music?.enabled && me.music?.autoPlay !== false) {
+      musicEngine.play(me.music);
+    }
+    setEntryAnimKey((k) => k + 1);
+    setTimeout(() => {
+      setIntroOverlayActive(false);
+      setIntroOverlayClosing(false);
+    }, 520);
+  }, [introOverlayClosing, me.music]);
 
   // Save profile to Server API + localStorage
   const saveProfileToServer = useCallback(
@@ -1095,6 +1170,9 @@ export default function ProfileTerminal({
   const winClasses = [
     "win",
     `card-${me.cardStyle || "terminal"}`,
+    me.entryAnimation && me.entryAnimation !== "none"
+      ? `entry-${me.entryAnimation}`
+      : "",
     me.visualFx?.cardFloat ? "fx-float" : "",
     me.visualFx?.borderBeam ? "fx-border-beam" : "",
   ]
@@ -1108,6 +1186,7 @@ export default function ProfileTerminal({
 
   const renderTerminalCard = () => (
     <main
+      key={entryAnimKey}
       ref={winRef}
       className={winClasses}
       onMouseMove={handleCardMouseMove}
@@ -1544,6 +1623,68 @@ export default function ProfileTerminal({
         hidden
         onChange={handleAvatarFileChange}
       />
+
+      {/* PANTALLA DE BIENVENIDA INTERACTIVA OPCIONAL (introScreen) */}
+      {introOverlayActive && (me.introScreen || "none") !== "none" && (
+        <div
+          className={`intro-screen-overlay intro-${me.introScreen}${
+            introOverlayClosing ? " closing" : ""
+          }`}
+          onClick={handleDismissIntroScreen}
+          role="button"
+          tabIndex={0}
+          aria-label="Entrar al perfil"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              handleDismissIntroScreen();
+            }
+          }}
+        >
+          <div className="intro-center-card">
+            <div className="intro-avatar-orb">
+              {me.avatar && !avatarError ? (
+                <img src={me.avatar} alt={me.user} />
+              ) : (
+                initials
+              )}
+            </div>
+
+            <h2 className="intro-user-title">{me.user}</h2>
+
+            {me.introScreen === "terminal-boot" && (
+              <div className="intro-terminal-lines">
+                <div>
+                  <b>[SYS]</b> INITIALIZING NEXUS // NODE /{activeSlug}
+                </div>
+                <div>
+                  <b>[AUD]</b> BGM STREAM READY ({me.music?.title || "READY"})
+                </div>
+                <div>
+                  <b>[OK]</b> CONEXIÓN ESTABLECIDA
+                </div>
+              </div>
+            )}
+
+            {(me.role || me.vibe) && me.introScreen !== "terminal-boot" && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--muted)",
+                  fontFamily: "var(--mono)",
+                }}
+              >
+                {me.role} {me.role && me.vibe ? "·" : ""} {me.vibe}
+              </div>
+            )}
+
+            <div className="intro-enter-pill">
+              <span>🔊</span>
+              <span>{me.introText || "[ CLICK PARA ENTRAR ]"}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==========================================================================
           MODO 1: RUTA PÚBLICA DE PERFIL (/ejemplo, /facxx14, etc.)
@@ -2667,6 +2808,203 @@ export default function ProfileTerminal({
                     </div>
                   </div>
 
+                  {/* ANIMACIONES DE ENTRADA Y PANTALLA DE BIENVENIDA (A DECISIÓN) */}
+                  <div className="ux-card">
+                    <div className="ux-card-head">
+                      <div className="ux-card-title-group">
+                        <div className="ux-card-icon">🚀</div>
+                        <div>
+                          <h3>
+                            Animaciones de Entrada &amp; Pantalla de Bienvenida (A Decisión)
+                          </h3>
+                          <p>
+                            Elige cómo aparece el perfil al entrar a la web y si
+                            deseas una pantalla interactiva previa estilo{" "}
+                            <em>Click to Enter</em>.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="ux-btn primary"
+                        onClick={() => setEntryAnimKey((k) => k + 1)}
+                        title="Repetir la animación de entrada en la vista previa"
+                      >
+                        ▶ Probar Entrada
+                      </button>
+                    </div>
+
+                    <div className="ux-field">
+                      <label className="ux-label">
+                        Animación de Entrada de la Tarjeta y Nodos
+                        <span>entryAnimation</span>
+                      </label>
+                      <div className="ux-option-grid">
+                        {(
+                          [
+                            {
+                              id: "cyber-boot",
+                              title: "⚡ Cyber Boot CRT",
+                              desc: "Despliegue láser + cascada orbital",
+                            },
+                            {
+                              id: "glitch-drop",
+                              title: "👾 Glitch Teleport",
+                              desc: "Distorsión cromática RGB + aterrizaje",
+                            },
+                            {
+                              id: "portal-warp",
+                              title: "🌀 Portal Dimensional 3D",
+                              desc: "Giro hiperespacial con perspectiva 3D",
+                            },
+                            {
+                              id: "neon-materialize",
+                              title: "✨ Escaneo Holográfico",
+                              desc: "Barrido láser vertical de arriba a abajo",
+                            },
+                            {
+                              id: "cinematic-fade",
+                              title: "🎬 Elevación Cinemática",
+                              desc: "Transición suave con aparición escalonada",
+                            },
+                            {
+                              id: "matrix-decode",
+                              title: "🟩 Pulso Cuántico",
+                              desc: "Destello de energía neón al aparecer",
+                            },
+                            {
+                              id: "none",
+                              title: "⏹ Sin Animación",
+                              desc: "Aparición instantánea sin efectos",
+                            },
+                          ] as Array<{
+                            id: EntryAnimation;
+                            title: string;
+                            desc: string;
+                          }>
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            className={`ux-option-card${
+                              (me.entryAnimation || "cyber-boot") === opt.id
+                                ? " active"
+                                : ""
+                            }`}
+                            onClick={() => {
+                              updateMe((prev) => ({
+                                ...prev,
+                                entryAnimation: opt.id,
+                              }));
+                              setEntryAnimKey((k) => k + 1);
+                            }}
+                          >
+                            <strong>{opt.title}</strong>
+                            <span>{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="ux-field">
+                      <label className="ux-label">
+                        Pantalla / Efecto de Bienvenida Previo (Opcional a Decisión)
+                        <span>introScreen</span>
+                      </label>
+                      <div className="ux-option-grid">
+                        {(
+                          [
+                            {
+                              id: "none",
+                              title: "🚀 Entrada Directa",
+                              desc: "Sin pantalla previa (entra directo al perfil)",
+                            },
+                            {
+                              id: "glass-blur",
+                              title: "🧊 Velo de Cristal Neón",
+                              desc: "Pantalla translúcida Click to Enter + audio 100%",
+                            },
+                            {
+                              id: "terminal-boot",
+                              title: "💻 BIOS Terminal Hacker",
+                              desc: "Consola cyberpunk de arranque del sistema",
+                            },
+                            {
+                              id: "cyber-gate",
+                              title: "🚪 Compuerta Láser",
+                              desc: "Sello táctico con líneas láser de seguridad",
+                            },
+                            {
+                              id: "pulse-portal",
+                              title: "🔮 Portal de Energía",
+                              desc: "Núcleo orbital pulsante con tu avatar",
+                            },
+                          ] as Array<{
+                            id: IntroScreenStyle;
+                            title: string;
+                            desc: string;
+                          }>
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            className={`ux-option-card${
+                              (me.introScreen || "none") === opt.id ? " active" : ""
+                            }`}
+                            onClick={() =>
+                              updateMe((prev) => ({
+                                ...prev,
+                                introScreen: opt.id,
+                              }))
+                            }
+                          >
+                            <strong>{opt.title}</strong>
+                            <span>{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(me.introScreen || "none") !== "none" && (
+                      <div className="ux-form-grid">
+                        <div className="ux-field">
+                          <label className="ux-label">
+                            Texto del Botón de Entrada
+                            <span>introText</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="ux-input mono"
+                            placeholder="[ CLICK PARA ENTRAR ]"
+                            value={me.introText || "[ CLICK PARA ENTRAR ]"}
+                            onChange={(e) =>
+                              updateMe((prev) => ({
+                                ...prev,
+                                introText: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div
+                          className="ux-field"
+                          style={{ justifyContent: "flex-end" }}
+                        >
+                          <button
+                            type="button"
+                            className="ux-btn primary"
+                            style={{ height: 40 }}
+                            onClick={() => {
+                              setIntroOverlayClosing(false);
+                              setIntroOverlayActive(true);
+                            }}
+                          >
+                            👁️ Previsualizar Pantalla de Bienvenida
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* INTERRUPTORES DE INTERACTIVIDAD & FX */}
                   <div className="ux-card">
                     <div className="ux-card-head">
@@ -3497,26 +3835,52 @@ export default function ProfileTerminal({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        className={`ux-toggle-card${
-                          me.music?.enabled ? " active" : ""
-                        }`}
-                        onClick={() => {
-                          const nextEnabled = !me.music?.enabled;
-                          if (!nextEnabled) musicEngine.stop();
-                          updateMe((prev) => ({
-                            ...prev,
-                            music: { ...prev.music, enabled: nextEnabled },
-                          }));
-                        }}
-                      >
-                        <div className="ux-toggle-info">
-                          <strong>Reproductor en Perfil</strong>
-                          <span>{me.music?.enabled ? "Visible" : "Oculto"}</span>
-                        </div>
-                        <div className="ux-switch" aria-hidden="true" />
-                      </button>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className={`ux-toggle-card${
+                            me.music?.autoPlay !== false ? " active" : ""
+                          }`}
+                          onClick={() => {
+                            const nextAuto = me.music?.autoPlay === false;
+                            updateMe((prev) => ({
+                              ...prev,
+                              music: { ...prev.music, autoPlay: nextAuto },
+                            }));
+                          }}
+                        >
+                          <div className="ux-toggle-info">
+                            <strong>🔊 Sonar al Entrar a la Web</strong>
+                            <span>
+                              {me.music?.autoPlay !== false
+                                ? "Autoplay Activo"
+                                : "Manual"}
+                            </span>
+                          </div>
+                          <div className="ux-switch" aria-hidden="true" />
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`ux-toggle-card${
+                            me.music?.enabled ? " active" : ""
+                          }`}
+                          onClick={() => {
+                            const nextEnabled = !me.music?.enabled;
+                            if (!nextEnabled) musicEngine.stop();
+                            updateMe((prev) => ({
+                              ...prev,
+                              music: { ...prev.music, enabled: nextEnabled },
+                            }));
+                          }}
+                        >
+                          <div className="ux-toggle-info">
+                            <strong>Reproductor en Perfil</strong>
+                            <span>{me.music?.enabled ? "Visible" : "Oculto"}</span>
+                          </div>
+                          <div className="ux-switch" aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="ux-field">
