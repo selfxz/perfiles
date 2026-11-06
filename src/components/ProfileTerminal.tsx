@@ -20,7 +20,7 @@ import {
   THEME_PRESETS,
   TitleEffect,
 } from "@/types/profile";
-import { musicEngine } from "@/utils/musicEngine";
+import { detectAudioUrlType, musicEngine } from "@/utils/musicEngine";
 import { downloadStaticProfileHtml } from "@/utils/exportHtml";
 
 const STORAGE_PROFILES_KEY = "facxx14_profiles_v35";
@@ -151,11 +151,16 @@ export default function ProfileTerminal({
 
   // Subscribe to MusicEngine state
   useEffect(() => {
-    return musicEngine.subscribe(({ isPlaying: p, isMuted: m }) => {
+    return musicEngine.subscribe(({ isPlaying: p, isMuted: m, error }) => {
       setIsPlaying(p);
       setIsMuted(m);
+      if (error) {
+        showToast(error);
+      }
     });
-  }, []);
+  }, [showToast]);
+
+  const metaFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Apply dynamic per-profile accent colors and scanline toggle to CSS
   useEffect(() => {
@@ -495,6 +500,73 @@ export default function ProfileTerminal({
       });
     },
     [activeSlug, isSystemMode, saveProfileToServer]
+  );
+
+  const handleAudioUrlChange = useCallback(
+    (rawInput: string, autoPlayNow = false) => {
+      const trimmed = rawInput.trim();
+      const detected = detectAudioUrlType(trimmed);
+
+      updateMe((prev) => {
+        const nextMusic = {
+          ...prev.music,
+          enabled: true,
+          source: "url" as MusicSource,
+          url: trimmed,
+          title:
+            prev.music.source !== "url" ||
+            prev.music.title === PRESET_NAMES[prev.music.preset || "crimson"]
+              ? detected.kind === "youtube"
+                ? "YouTube Audio Track"
+                : detected.kind === "soundcloud"
+                ? "SoundCloud Track"
+                : detected.kind === "spotify"
+                ? "Spotify Track"
+                : prev.music.title || "Audio Stream"
+              : prev.music.title,
+          artist:
+            prev.music.source !== "url" ||
+            prev.music.artist === "Red // Black System Beat"
+              ? detected.label
+              : prev.music.artist,
+        };
+        if ((autoPlayNow || musicEngine.isPlaying()) && trimmed) {
+          setTimeout(() => musicEngine.play(nextMusic), 60);
+        }
+        return { ...prev, music: nextMusic };
+      });
+
+      if (metaFetchTimerRef.current) clearTimeout(metaFetchTimerRef.current);
+      if (
+        trimmed &&
+        (detected.kind === "youtube" ||
+          detected.kind === "soundcloud" ||
+          detected.kind === "spotify")
+      ) {
+        metaFetchTimerRef.current = setTimeout(async () => {
+          try {
+            const res = await fetch(
+              `/api/audio-proxy?meta=1&url=${encodeURIComponent(trimmed)}`
+            );
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.ok && (data.title || data.artist)) {
+              updateMe((prev) => ({
+                ...prev,
+                music: {
+                  ...prev.music,
+                  title: data.title || prev.music.title,
+                  artist: data.artist || detected.label,
+                },
+              }));
+            }
+          } catch {
+            // ignore metadata error
+          }
+        }, 350);
+      }
+    },
+    [updateMe]
   );
 
   // Delete profile from Server API + localStorage
@@ -1274,90 +1346,122 @@ export default function ProfileTerminal({
             <section id="musicSection">
               <h2 className="lbl">
                 <span>audio // bgm</span>
-              </h2>
-              <div
-                className={`music-hud${isPlaying ? " playing" : ""}`}
-                id="musicHud"
-              >
-                <button
-                  type="button"
-                  className="music-play-btn"
-                  id="musicPlayBtn"
-                  aria-label="Reproducir o pausar música"
-                  onClick={() => musicEngine.toggle(me.music)}
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    {isPlaying ? (
-                      <>
-                        <rect x="6" y="4" width="4" height="16" />
-                        <rect x="14" y="4" width="4" height="16" />
-                      </>
-                    ) : (
-                      <polygon points="6 4 20 12 6 20 6 4" />
-                    )}
-                  </svg>
-                </button>
-                <div className="music-info">
-                  <div className="music-title-row">
-                    <div className="eq-bars" aria-hidden="true">
-                      <i></i>
-                      <i></i>
-                      <i></i>
-                      <i></i>
-                    </div>
-                    <span className="music-title" id="musicTitleDisplay">
-                      {me.music.title || "Audio Track"}
-                    </span>
-                  </div>
-                  <span className="music-artist" id="musicArtistDisplay">
-                    {`${me.music.artist || "System Audio"} · ${
-                      isPlaying ? "Reproduciendo" : "En pausa"
-                    }`}
-                  </span>
-                </div>
-                <div className="music-vol-wrap">
-                  <button
-                    type="button"
-                    className="music-mute-btn"
-                    id="musicMuteBtn"
-                    aria-label="Silenciar"
-                    onClick={() => musicEngine.toggleMute()}
+                {me.music.source === "url" && me.music.url && (
+                  <small
+                    style={{
+                      fontSize: 10,
+                      color: "var(--accent)",
+                      letterSpacing: "0.08em",
+                    }}
                   >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      {isMuted || (me.music.volume ?? 70) === 0 ? (
-                        <>
-                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                          <line x1="23" y1="9" x2="17" y2="15" />
-                          <line x1="17" y1="9" x2="23" y2="15" />
-                        </>
-                      ) : (
-                        <>
-                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                        </>
-                      )}
-                    </svg>
-                  </button>
-                  <input
-                    type="range"
-                    className="music-vol-slider"
-                    id="musicVolSlider"
-                    min={0}
-                    max={100}
-                    value={me.music.volume ?? 70}
-                    aria-label="Volumen"
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      updateMe((prev) => ({
-                        ...prev,
-                        music: { ...prev.music, volume: v },
-                      }));
-                      musicEngine.setVolume(v, me.music);
+                    {detectAudioUrlType(me.music.url).label}
+                  </small>
+                )}
+              </h2>
+
+              {me.music.source === "url" &&
+              detectAudioUrlType(me.music.url).kind === "spotify" &&
+              detectAudioUrlType(me.music.url).spotifyEmbedUrl ? (
+                <div style={{ borderRadius: 12, overflow: "hidden" }}>
+                  <iframe
+                    src={detectAudioUrlType(me.music.url).spotifyEmbedUrl}
+                    width="100%"
+                    height="80"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    style={{
+                      borderRadius: 12,
+                      border: "1px solid var(--line-bright)",
+                      display: "block",
                     }}
                   />
                 </div>
-              </div>
+              ) : (
+                <div
+                  className={`music-hud${isPlaying ? " playing" : ""}`}
+                  id="musicHud"
+                >
+                  <button
+                    type="button"
+                    className="music-play-btn"
+                    id="musicPlayBtn"
+                    aria-label="Reproducir o pausar música"
+                    onClick={() => musicEngine.toggle(me.music)}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      {isPlaying ? (
+                        <>
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </>
+                      ) : (
+                        <polygon points="6 4 20 12 6 20 6 4" />
+                      )}
+                    </svg>
+                  </button>
+                  <div className="music-info">
+                    <div className="music-title-row">
+                      <div className="eq-bars" aria-hidden="true">
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                      </div>
+                      <span className="music-title" id="musicTitleDisplay">
+                        {me.music.title || "Audio Track"}
+                      </span>
+                    </div>
+                    <span className="music-artist" id="musicArtistDisplay">
+                      {`${me.music.artist || "System Audio"} · ${
+                        isPlaying ? "Reproduciendo" : "En pausa"
+                      }`}
+                    </span>
+                  </div>
+                  <div className="music-vol-wrap">
+                    <button
+                      type="button"
+                      className="music-mute-btn"
+                      id="musicMuteBtn"
+                      aria-label="Silenciar"
+                      onClick={() => musicEngine.toggleMute()}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        {isMuted || (me.music.volume ?? 70) === 0 ? (
+                          <>
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                            <line x1="23" y1="9" x2="17" y2="15" />
+                            <line x1="17" y1="9" x2="23" y2="15" />
+                          </>
+                        ) : (
+                          <>
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                          </>
+                        )}
+                      </svg>
+                    </button>
+                    <input
+                      type="range"
+                      className="music-vol-slider"
+                      id="musicVolSlider"
+                      min={0}
+                      max={100}
+                      value={me.music.volume ?? 70}
+                      aria-label="Volumen"
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        updateMe((prev) => ({
+                          ...prev,
+                          music: { ...prev.music, volume: v },
+                        }));
+                        musicEngine.setVolume(v, me.music);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </section>
           )}
         </div>
@@ -3428,8 +3532,8 @@ export default function ProfileTerminal({
                             },
                             {
                               id: "url",
-                              title: "🌐 Link Directo",
-                              desc: "URL externa .mp3 / .ogg / stream",
+                              title: "🌐 Link de Música",
+                              desc: "YouTube, Spotify, SoundCloud o .mp3",
                             },
                           ] as Array<{
                             id: MusicSource;
@@ -3567,24 +3671,53 @@ export default function ProfileTerminal({
                     {me.music?.source === "url" && (
                       <div className="ux-field">
                         <label className="ux-label">
-                          URL Directa del Audio
-                          <span>https://...</span>
+                          Link de la Canción (YouTube, Spotify, SoundCloud, Drive, Dropbox o .MP3)
+                          <span style={{ color: "var(--accent)", fontWeight: 700 }}>
+                            {me.music?.url
+                              ? `✓ ${detectAudioUrlType(me.music.url).label}`
+                              : "Pega cualquier enlace"}
+                          </span>
                         </label>
-                        <input
-                          type="text"
-                          className="ux-input mono"
-                          placeholder="https://ejemplo.com/cancion.mp3"
-                          value={me.music?.url || ""}
-                          onChange={(e) =>
-                            updateMe((prev) => ({
-                              ...prev,
-                              music: {
-                                ...prev.music,
-                                url: e.target.value.trim(),
-                              },
-                            }))
-                          }
-                        />
+                        <div className="dyn-row" style={{ gap: 8, flexWrap: "wrap" }}>
+                          <input
+                            type="text"
+                            className="ux-input mono"
+                            style={{ flex: 1, minWidth: 230 }}
+                            placeholder="https://www.youtube.com/watch?v=... o link de Spotify / SoundCloud / .mp3"
+                            value={me.music?.url || ""}
+                            onChange={(e) =>
+                              handleAudioUrlChange(e.target.value, false)
+                            }
+                            onPaste={(e) => {
+                              const pasted = e.clipboardData.getData("text");
+                              if (pasted) {
+                                e.preventDefault();
+                                handleAudioUrlChange(pasted, true);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="ux-btn primary"
+                            onClick={() => {
+                              if (!me.music?.url) {
+                                showToast("Pega primero un enlace de música");
+                                return;
+                              }
+                              if (isPlaying) {
+                                musicEngine.pause();
+                              } else {
+                                musicEngine.play({
+                                  ...me.music,
+                                  enabled: true,
+                                  source: "url",
+                                });
+                              }
+                            }}
+                          >
+                            {isPlaying ? "⏸ Pausar" : "▶ Probar Link"}
+                          </button>
+                        </div>
                       </div>
                     )}
 
