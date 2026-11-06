@@ -25,7 +25,7 @@ import { downloadStaticProfileHtml } from "@/utils/exportHtml";
 
 const STORAGE_PROFILES_KEY = "facxx14_profiles_v35";
 const STORAGE_PASS_HASH_KEY = "facxx14_admin_hash_v35";
-const SESSION_SYSTEM_LOCKED_KEY = "facxx14_system_locked_v35";
+const SESSION_SYSTEM_UNLOCKED_KEY = "nexus_studio_unlocked_v4";
 
 async function sha256Browser(str: string): Promise<string> {
   const buf = new TextEncoder().encode(str);
@@ -89,9 +89,11 @@ export default function ProfileTerminal({
   const [copiedTagId, setCopiedTagId] = useState<string | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState<boolean>(false);
 
-  // System state (for `/` mode="system")
-  const [hasMasterPassword, setHasMasterPassword] = useState<boolean>(initialHasPassword);
-  const [isSystemLocked, setIsSystemLocked] = useState<boolean>(false);
+  // System state (for `/` mode="system"): locked by default until Access Key is verified
+  const [hasMasterPassword, setHasMasterPassword] = useState<boolean>(
+    initialHasPassword || true
+  );
+  const [isSystemLocked, setIsSystemLocked] = useState<boolean>(isSystemMode);
   const [studioSection, setStudioSection] = useState<
     "routes" | "appearance" | "identity" | "links" | "audio" | "system"
   >("routes");
@@ -294,11 +296,10 @@ export default function ProfileTerminal({
         if (localPass) {
           setHasMasterPassword(true);
         }
-        if (
-          isSystemMode &&
-          sessionStorage.getItem(SESSION_SYSTEM_LOCKED_KEY) === "1"
-        ) {
-          setIsSystemLocked(true);
+        if (isSystemMode) {
+          const unlockedInSession =
+            sessionStorage.getItem(SESSION_SYSTEM_UNLOCKED_KEY) === "1";
+          setIsSystemLocked(!unlockedInSession);
         }
       } catch {
         // ignore storage errors
@@ -723,39 +724,44 @@ export default function ProfileTerminal({
         const inputHash = await sha256Browser(authPass);
         if (localHash && localHash === inputHash) {
           try {
-            sessionStorage.removeItem(SESSION_SYSTEM_LOCKED_KEY);
+            sessionStorage.setItem(SESSION_SYSTEM_UNLOCKED_KEY, "1");
           } catch {}
           setIsSystemLocked(false);
           setAuthPass("");
-          showToast("Sistema Interno desbloqueado");
+          setAuthError("");
+          showToast("Acceso concedido al Sistema Interno (/)");
           return;
         }
-        setAuthError(data.error || "Acceso denegado: Clave Maestra incorrecta.");
+        setAuthError(
+          data.error || "Acceso denegado: Llave de Acceso incorrecta."
+        );
         return;
       }
 
       const hash = await sha256Browser(authPass);
       try {
         localStorage.setItem(STORAGE_PASS_HASH_KEY, hash);
-        sessionStorage.removeItem(SESSION_SYSTEM_LOCKED_KEY);
+        sessionStorage.setItem(SESSION_SYSTEM_UNLOCKED_KEY, "1");
       } catch {}
 
       setHasMasterPassword(true);
       setIsSystemLocked(false);
       setAuthPass("");
-      showToast("Sistema Interno desbloqueado");
+      setAuthError("");
+      showToast("Acceso concedido al Sistema Interno (/)");
     } catch {
       const inputHash = await sha256Browser(authPass);
       const localHash = localStorage.getItem(STORAGE_PASS_HASH_KEY);
-      if (!localHash || localHash === inputHash) {
+      if (localHash && localHash === inputHash) {
         try {
-          sessionStorage.removeItem(SESSION_SYSTEM_LOCKED_KEY);
+          sessionStorage.setItem(SESSION_SYSTEM_UNLOCKED_KEY, "1");
         } catch {}
         setIsSystemLocked(false);
         setAuthPass("");
-        showToast("Sistema Interno desbloqueado");
+        setAuthError("");
+        showToast("Acceso concedido al Sistema Interno (/)");
       } else {
-        setAuthError("Acceso denegado: Clave Maestra incorrecta.");
+        setAuthError("Acceso denegado: Llave de Acceso incorrecta.");
       }
     }
   };
@@ -1546,8 +1552,9 @@ export default function ProfileTerminal({
 
       {/* ==========================================================================
           MODO 2: NEXUS STUDIO — SISTEMA INTERNO UI/UX EN LA RAÍZ (/)
+          SOLO SE MONTA SI EL USUARIO INGRESÓ LA LLAVE DE ACCESO VÁLIDA
           ========================================================================== */}
-      {isSystemMode && (
+      {isSystemMode && !isSystemLocked && (
         <>
           {/* CABECERA FLOTANTE DE COMANDO (COMMAND HEADER) */}
           <header className="studio-header" id="adminTopbar">
@@ -1636,18 +1643,18 @@ export default function ProfileTerminal({
               </a>
               <button
                 type="button"
-                className="ux-btn"
-                title="Bloquear pantalla del Estudio con Clave Maestra"
+                className="ux-btn danger"
+                title="Cerrar sesión y bloquear la raíz (/) con Llave de Acceso"
                 onClick={() => {
                   try {
-                    sessionStorage.setItem(SESSION_SYSTEM_LOCKED_KEY, "1");
+                    sessionStorage.removeItem(SESSION_SYSTEM_UNLOCKED_KEY);
                   } catch {}
                   setAuthError("");
                   setAuthPass("");
                   setIsSystemLocked(true);
                 }}
               >
-                🔒
+                🔒 Bloquear
               </button>
             </div>
           </header>
@@ -4022,52 +4029,116 @@ export default function ProfileTerminal({
         </div>
       </div>
 
-      {/* MODAL DE SEGURIDAD CUANDO EL SISTEMA INTERNO SE BLOQUEA MANUALMENTE */}
-      {isSystemMode && (
+      {/* PORTAL OBLIGATORIO DE LLAVE DE ACCESO PARA ENTRAR A LA RAÍZ (/) */}
+      {isSystemMode && isSystemLocked && (
         <div
-          className={`modal-overlay${isSystemLocked ? " open" : ""}`}
+          className="modal-overlay open"
           id="authModal"
-          aria-hidden={!isSystemLocked}
+          aria-hidden={false}
+          style={{
+            background: "rgba(4, 4, 8, 0.88)",
+            backdropFilter: "blur(18px)",
+          }}
         >
-          <div className="auth-card" role="dialog" aria-labelledby="authTitle">
-            <h3 id="authTitle">
+          <div
+            className="auth-card"
+            role="dialog"
+            aria-labelledby="authTitle"
+            style={{
+              maxWidth: 420,
+              padding: "28px 26px",
+              borderRadius: 18,
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              boxShadow:
+                "0 28px 90px rgba(0, 0, 0, 0.92), 0 0 45px color-mix(in srgb, var(--accent) 22%, transparent)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                marginBottom: 6,
+              }}
+            >
+              <div className="studio-logo-orb" aria-hidden="true">
+                🔑
+              </div>
+              <div>
+                <h3 id="authTitle" style={{ margin: 0, fontSize: 18 }}>
+                  {hasMasterPassword
+                    ? "NEXUS // STUDIO · Acceso Restringido"
+                    : "Configurar Llave de Acceso"}
+                </h3>
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: "var(--accent)",
+                    fontFamily: "var(--mono)",
+                  }}
+                >
+                  RAÍZ PROTEGIDA (/) · LLAVE REQUERIDA
+                </span>
+              </div>
+            </div>
+
+            <p id="authDesc" style={{ marginTop: 8, marginBottom: 16 }}>
               {hasMasterPassword
-                ? "Sistema Interno Bloqueado"
-                : "Configurar Clave Maestra"}
-            </h3>
-            <p id="authDesc">
-              {hasMasterPassword
-                ? "Introduce tu Clave Maestra para desbloquear el Sistema Interno (/)."
-                : "Crea una Clave Maestra para proteger el Sistema Interno."}
+                ? "Para entrar a la raíz (/) y administrar o crear perfiles necesitas introducir la Llave de Acceso."
+                : "Crea una Llave de Acceso para proteger la entrada a la raíz (/)."}
             </p>
             <form onSubmit={handleAuthSubmit} autoComplete="off">
-              <div className="ed-field" style={{ marginBottom: 10 }}>
-                <label>Clave Maestra</label>
+              <div className="ux-field" style={{ marginBottom: 14 }}>
+                <label className="ux-label">
+                  Llave de Acceso
+                  <span>Obligatoria</span>
+                </label>
                 <input
                   type="password"
-                  className="ed-input"
-                  placeholder="••••••••"
+                  className="ux-input mono"
+                  placeholder="Introduce tu llave de acceso..."
                   value={authPass}
-                  onChange={(e) => setAuthPass(e.target.value)}
+                  onChange={(e) => {
+                    setAuthPass(e.target.value);
+                    if (authError) setAuthError("");
+                  }}
+                  autoFocus
                   required
                 />
               </div>
               {!hasMasterPassword && (
-                <div className="ed-field" style={{ marginBottom: 10 }}>
-                  <label>Confirmar Clave Maestra</label>
+                <div className="ux-field" style={{ marginBottom: 14 }}>
+                  <label className="ux-label">Confirmar Llave de Acceso</label>
                   <input
                     type="password"
-                    className="ed-input"
-                    placeholder="Repite tu clave"
+                    className="ux-input mono"
+                    placeholder="Repite tu llave"
                     value={authConfirm}
                     onChange={(e) => setAuthConfirm(e.target.value)}
                   />
                 </div>
               )}
-              <div className="auth-err">{authError}</div>
+              {authError && (
+                <div
+                  className="auth-err"
+                  style={{
+                    marginBottom: 12,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    background: "rgba(255, 26, 53, 0.14)",
+                    border: "1px solid rgba(255, 26, 53, 0.4)",
+                  }}
+                >
+                  {authError}
+                </div>
+              )}
               <div style={{ display: "flex", gap: 8 }}>
-                <button type="submit" className="btn-primary">
-                  Desbloquear Sistema
+                <button
+                  type="submit"
+                  className="ux-btn primary"
+                  style={{ width: "100%", height: 42, fontSize: 13 }}
+                >
+                  🔓 Verificar Llave e Ingresar al Sistema (/)
                 </button>
               </div>
             </form>

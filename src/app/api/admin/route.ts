@@ -8,8 +8,9 @@ function sha256Server(input: string): string {
 
 export async function GET() {
   const store = await readStore();
+  const envKey = (process.env.ADMIN_ACCESS_KEY || "").trim();
   return NextResponse.json({
-    hasPassword: Boolean(store.adminConfig.passwordHash),
+    hasPassword: Boolean(store.adminConfig.passwordHash || envKey),
   });
 }
 
@@ -24,11 +25,12 @@ export async function POST(req: Request) {
 
     const store = await readStore();
     const existingHash = store.adminConfig.passwordHash;
+    const envAccessKey = (process.env.ADMIN_ACCESS_KEY || "").trim();
 
     if (action === "update") {
       if (!newPassword || newPassword.length < 4) {
         return NextResponse.json(
-          { error: "La nueva clave debe tener al menos 4 caracteres." },
+          { error: "La nueva llave de acceso debe tener al menos 4 caracteres." },
           { status: 400 }
         );
       }
@@ -40,14 +42,14 @@ export async function POST(req: Request) {
 
     if (!password || password.length < 4) {
       return NextResponse.json(
-        { error: "La clave debe tener al menos 4 caracteres." },
+        { error: "La llave de acceso debe tener al menos 4 caracteres." },
         { status: 400 }
       );
     }
 
     const inputHash = sha256Server(password);
 
-    if (!existingHash) {
+    if (!existingHash && !envAccessKey) {
       store.adminConfig.passwordHash = inputHash;
       store.adminConfig.updatedAt = new Date().toISOString();
       await writeStore(store);
@@ -58,7 +60,10 @@ export async function POST(req: Request) {
       });
     }
 
-    if (inputHash === existingHash) {
+    const matchesStoredHash = Boolean(existingHash && inputHash === existingHash);
+    const matchesEnvKey = Boolean(envAccessKey && password === envAccessKey);
+
+    if (matchesStoredHash || matchesEnvKey) {
       return NextResponse.json({
         ok: true,
         firstSetup: false,
@@ -67,15 +72,14 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { error: "Acceso denegado: Clave Maestra incorrecta." },
+      { error: "Acceso denegado: Llave de Acceso incorrecta." },
       { status: 401 }
     );
   } catch (err) {
     console.error("POST /api/admin error:", err);
     return NextResponse.json(
-      { error: "Error en autenticación de administrador." },
+      { error: "Error verificando la Llave de Acceso." },
       { status: 500 }
     );
   }
 }
-
