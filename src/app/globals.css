@@ -60,10 +60,13 @@ body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 3;
+  z-index: 40;
   pointer-events: none;
-  background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px);
-  mix-blend-mode: multiply;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.38) 0px 2px,
+    rgba(255, 255, 255, 0.018) 2px 4px
+  );
 }
 
 #rain {
@@ -1659,71 +1662,171 @@ body.no-scanlines::after {
   display: none !important;
 }
 
-/* Luz interactiva seguidora del cursor */
+/* 1. Luz interactiva seguidora del cursor (Spotlight Global + Spotlight en Tarjeta) */
 .cursor-spotlight {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 520px;
-  height: 520px;
+  top: 50%;
+  left: 50%;
+  width: 560px;
+  height: 560px;
   border-radius: 50%;
   pointer-events: none;
-  z-index: 1;
+  z-index: 45;
   background: radial-gradient(
     circle,
-    color-mix(in srgb, var(--accent) 16%, transparent) 0%,
-    color-mix(in srgb, var(--accent-2) 6%, transparent) 38%,
-    transparent 70%
+    color-mix(in srgb, var(--accent) 28%, transparent) 0%,
+    color-mix(in srgb, var(--accent-2) 12%, transparent) 34%,
+    transparent 68%
   );
   transform: translate(-50%, -50%);
-  transition: opacity 0.3s ease;
   mix-blend-mode: screen;
+  filter: blur(8px);
 }
 
-/* Animación de levitación 3D de la ventana del perfil */
+.win-cursor-glow-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 8;
+  background: radial-gradient(
+    320px circle at var(--spot-x, 50%) var(--spot-y, 35%),
+    color-mix(in srgb, var(--accent) 26%, transparent) 0%,
+    color-mix(in srgb, var(--accent-2) 10%, transparent) 42%,
+    transparent 75%
+  );
+  mix-blend-mode: screen;
+  transition: opacity 0.2s ease;
+}
+
+/* 2. Contenedor independiente de Levitación Flotante (no colisiona con tilt3d ni entryAnimation) */
+.win-float-shell {
+  width: 100%;
+  max-width: 490px;
+  margin-inline: auto;
+  position: relative;
+  z-index: 1;
+}
+
 @keyframes cardFloat3D {
   0%, 100% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-9px);
+    transform: translateY(-14px);
   }
-}
-.win.fx-float {
-  animation: cardFloat3D 5.2s ease-in-out infinite;
 }
 
-/* Rayo láser recorriendo el perímetro de la tarjeta */
+.win-float-shell.fx-float {
+  animation: cardFloat3D 3.6s ease-in-out infinite;
+}
+
+/* 3. Contenedor independiente de Inclinación 3D Parallax + Reflejo Holográfico */
+.win-tilt-shell {
+  width: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.win-tilt-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 9;
+  opacity: var(--glare-opacity, 0);
+  background: radial-gradient(
+    360px circle at var(--glare-x, 50%) var(--glare-y, 50%),
+    rgba(255, 255, 255, 0.22) 0%,
+    color-mix(in srgb, var(--accent) 16%, transparent) 38%,
+    transparent 72%
+  );
+  mix-blend-mode: overlay;
+  transition: opacity 0.2s ease;
+}
+
+/* 4. Rayo Láser Perimetral (360° real sin recorte de máscara) */
 @keyframes borderBeamSpin {
   0% {
-    transform: rotate(0deg);
+    transform: translate(-50%, -50%) rotate(0deg);
   }
   100% {
-    transform: rotate(360deg);
+    transform: translate(-50%, -50%) rotate(360deg);
   }
 }
-.win.fx-border-beam::before {
-  content: "";
+
+.win-border-beam-track {
   position: absolute;
-  inset: -2px;
+  inset: 0;
   border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    transparent 68%,
-    var(--accent) 82%,
-    var(--accent-2) 92%,
-    var(--accent) 100%
-  );
+  padding: 2.5px;
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  z-index: 10;
-  animation: borderBeamSpin 6s linear infinite;
+  z-index: 14;
+  overflow: hidden;
+  filter: drop-shadow(0 0 10px var(--accent));
+}
+
+.win-border-beam-spinner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 220%;
+  aspect-ratio: 1 / 1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 210deg,
+    var(--accent) 290deg,
+    var(--accent-2) 335deg,
+    var(--accent) 360deg
+  );
+  animation: borderBeamSpin 3.4s linear infinite;
+}
+
+/* 5. Scanlines CRT de Monitor directamente sobre la ventana del perfil */
+@keyframes crtRefreshBar {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(900%);
+  }
+}
+
+.win-scanlines-layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 12;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.46) 0px 2px,
+    rgba(255, 255, 255, 0.035) 2px 4px
+  );
+}
+
+.win-scanlines-layer::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 55px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 14%, rgba(255, 255, 255, 0.06)),
+    transparent
+  );
+  animation: crtRefreshBar 5.5s linear infinite;
 }
 
 /* --------------------------------------------------------------------------

@@ -196,35 +196,65 @@ export default function ProfileTerminal({
     };
   }, [me.visualFx?.scanlines]);
 
-  // Interactive cursor spotlight ref
+  // Interactive cursor spotlight & 3D tilt refs
   const spotlightRef = useRef<HTMLDivElement | null>(null);
+  const tiltWrapRef = useRef<HTMLDivElement | null>(null);
   const winRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
-    if (!me.visualFx?.cursorGlow) return;
     const onMove = (e: MouseEvent) => {
-      if (spotlightRef.current) {
+      if (spotlightRef.current && me.visualFx?.cursorGlow) {
         spotlightRef.current.style.left = `${e.clientX}px`;
         spotlightRef.current.style.top = `${e.clientY}px`;
+      }
+      if (winRef.current && me.visualFx?.cursorGlow) {
+        const rect = winRef.current.getBoundingClientRect();
+        const relX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+        const relY = ((e.clientY - rect.top) / Math.max(1, rect.height)) * 100;
+        winRef.current.style.setProperty("--spot-x", `${relX.toFixed(1)}%`);
+        winRef.current.style.setProperty("--spot-y", `${relY.toFixed(1)}%`);
       }
     };
     window.addEventListener("mousemove", onMove, { passive: true });
     return () => window.removeEventListener("mousemove", onMove);
   }, [me.visualFx?.cursorGlow]);
 
+  useEffect(() => {
+    if (!me.visualFx?.tilt3d && tiltWrapRef.current) {
+      tiltWrapRef.current.style.transform = "";
+      winRef.current?.style.setProperty("--glare-opacity", "0");
+    }
+  }, [me.visualFx?.tilt3d]);
+
   const handleCardMouseMove = (e: React.MouseEvent<HTMLElement>) => {
-    if (!me.visualFx?.tilt3d || !winRef.current) return;
+    if (!winRef.current) return;
     const rect = winRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
-    winRef.current.style.transform = `perspective(950px) rotateX(${(
-      -y * 6.5
-    ).toFixed(2)}deg) rotateY(${(x * 6.5).toFixed(2)}deg)`;
+    const pctX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+    const pctY = ((e.clientY - rect.top) / Math.max(1, rect.height)) * 100;
+
+    winRef.current.style.setProperty("--spot-x", `${pctX.toFixed(1)}%`);
+    winRef.current.style.setProperty("--spot-y", `${pctY.toFixed(1)}%`);
+    winRef.current.style.setProperty("--glare-x", `${pctX.toFixed(1)}%`);
+    winRef.current.style.setProperty("--glare-y", `${pctY.toFixed(1)}%`);
+
+    if (!me.visualFx?.tilt3d || !tiltWrapRef.current) return;
+    const x = (e.clientX - rect.left) / Math.max(1, rect.width) - 0.5;
+    const y = (e.clientY - rect.top) / Math.max(1, rect.height) - 0.5;
+    tiltWrapRef.current.style.transform = `perspective(820px) rotateX(${(
+      -y * 14
+    ).toFixed(2)}deg) rotateY(${(x * 14).toFixed(
+      2
+    )}deg) scale3d(1.018, 1.018, 1.018)`;
+    winRef.current.style.setProperty("--glare-opacity", "1");
   };
 
   const handleCardMouseLeave = () => {
-    if (!winRef.current) return;
-    winRef.current.style.transform = "";
+    if (tiltWrapRef.current) {
+      tiltWrapRef.current.style.transform = "";
+    }
+    if (winRef.current) {
+      winRef.current.style.setProperty("--glare-opacity", "0");
+    }
   };
 
   // Topbar spacing in system mode
@@ -1173,7 +1203,6 @@ export default function ProfileTerminal({
     me.entryAnimation && me.entryAnimation !== "none"
       ? `entry-${me.entryAnimation}`
       : "",
-    me.visualFx?.cardFloat ? "fx-float" : "",
     me.visualFx?.borderBeam ? "fx-border-beam" : "",
   ]
     .filter(Boolean)
@@ -1185,14 +1214,34 @@ export default function ProfileTerminal({
       : `hero-name title-${me.titleEffect}`;
 
   const renderTerminalCard = () => (
-    <main
-      key={entryAnimKey}
-      ref={winRef}
-      className={winClasses}
-      onMouseMove={handleCardMouseMove}
-      onMouseLeave={handleCardMouseLeave}
+    <div
+      className={`win-float-shell${me.visualFx?.cardFloat ? " fx-float" : ""}`}
     >
-      <header className="bar">
+      <div
+        ref={tiltWrapRef}
+        className={`win-tilt-shell${
+          me.visualFx?.tilt3d ? " fx-tilt-active" : ""
+        }`}
+        onMouseMove={handleCardMouseMove}
+        onMouseLeave={handleCardMouseLeave}
+      >
+        <main key={entryAnimKey} ref={winRef} className={winClasses}>
+          {me.visualFx?.borderBeam && (
+            <div className="win-border-beam-track" aria-hidden="true">
+              <div className="win-border-beam-spinner" />
+            </div>
+          )}
+          {me.visualFx?.cursorGlow && (
+            <div className="win-cursor-glow-layer" aria-hidden="true" />
+          )}
+          {me.visualFx?.tilt3d && (
+            <div className="win-tilt-glare" aria-hidden="true" />
+          )}
+          {me.visualFx?.scanlines !== false && (
+            <div className="win-scanlines-layer" aria-hidden="true" />
+          )}
+
+          <header className="bar">
         <div className="dots" aria-hidden="true">
           <i></i>
           <i></i>
@@ -1600,7 +1649,9 @@ export default function ProfileTerminal({
           <span>red//black v4.0</span>
         </div>
       </footer>
-    </main>
+        </main>
+      </div>
+    </div>
   );
 
   return (
@@ -1612,7 +1663,7 @@ export default function ProfileTerminal({
         enabled={(me.bgEffect || "matrix") !== "none" && me.rainEnabled !== false}
       />
 
-      {me.visualFx?.cursorGlow !== false && (
+      {Boolean(me.visualFx?.cursorGlow) && (
         <div ref={spotlightRef} className="cursor-spotlight" aria-hidden="true" />
       )}
 
